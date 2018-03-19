@@ -182,7 +182,12 @@ func (s *Storage) SaveAccess(data *osin.AccessData) (err error) {
 		return errors.Wrap(err, "failed to encode access")
 	}
 
-	accessID := uuid.NewV4().String()
+	acUUID, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+
+	accessID := acUUID.String()
 
 	if _, err := conn.Do("SETEX", s.makeKey("access", accessID), data.ExpiresIn, string(payload)); err != nil {
 		return errors.Wrap(err, "failed to save access")
@@ -288,13 +293,6 @@ func (s *Storage) loadAccessByKey(key string) (*osin.AccessData, error) {
 	if err := decode(accessGob, &access); err != nil {
 		return nil, errors.Wrap(err, "failed to decode access gob")
 	}
-
-	ttl, err := redis.Int(conn.Do("TTL", accessIDKey))
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get access TTL")
-	}
-
-	access.ExpiresIn = int32(ttl)
 
 	access.Client, err = s.GetClient(access.Client.GetId())
 	if err != nil {
